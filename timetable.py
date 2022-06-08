@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-# Timetable [v19522]
+# Timetable [v5622]
 from re import match
-from os import mkdir
+from os import mkdir, system, name
 from tqdm import tqdm
 from icecream import ic
 from copy import deepcopy
@@ -145,9 +145,6 @@ worker_name = configParser.get('Worker Details', 'workerName')
 worker_area = configParser.get('Worker Details', 'workerArea')
 worker_username = b64encode(configParser.get('Worker Credentials', 'workerUsername').encode('utf-8'))
 worker_password = b64encode(configParser.get('Worker Credentials', 'workerPassword').encode('utf-8'))
-
-manager_id = configParser.get('Manager Details', 'managerID')
-manager_name = configParser.get('Manager Details', 'managerName')
 
 envfile = join(dirname(__file__), '.timetable-env.json')
 
@@ -363,7 +360,7 @@ def timetable(year, month, *shows_weekends):
 
 		worktime_table.add_row([fday, getattr(ConsoleColor, color) + str(value) + ConsoleColor.END])
 
-	print()
+	system('cls' if name == 'nt' else 'clear')
 	print(worktime_table)
 	print_something('WHITE', "Month Worktime: {}".format(format_timedelta(sum(month_worktime, timedelta()))))
 
@@ -388,9 +385,9 @@ def _search_assistances(date, do_print):
 
 	lenght_list = []
 	for item in request_json['results']:
-		date_begin = datetime.strptime(item['date_begin'][:-6], '%Y-%m-%dT%H:%M:%S').strftime('%d/%m/%Y %H:%M:%S')
-		date_end = datetime.strptime(item['date_end'][:-6], '%Y-%m-%dT%H:%M:%S').strftime('%d/%m/%Y %H:%M:%S')
-		assistance_lenght = datetime.strptime(item['date_end'][:-6], '%Y-%m-%dT%H:%M:%S') - datetime.strptime(item['date_begin'][:-6], '%Y-%m-%dT%H:%M:%S')
+		date_begin = datetime.strptime(item['date_begin'][:19], '%Y-%m-%dT%H:%M:%S').strftime('%d/%m/%Y %H:%M:%S')
+		date_end = datetime.strptime(item['date_end'][:19], '%Y-%m-%dT%H:%M:%S').strftime('%d/%m/%Y %H:%M:%S')
+		assistance_lenght = datetime.strptime(item['date_end'][:19], '%Y-%m-%dT%H:%M:%S') - datetime.strptime(item['date_begin'][:19], '%Y-%m-%dT%H:%M:%S')
 
 		lenght_list.append(assistance_lenght)
 
