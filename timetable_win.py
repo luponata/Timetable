@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-# Timetable [13722]
+# Timetable for Windows Pyinstaller[v13722]
 
 from re import match
 from os import mkdir, system, name
 from tqdm import tqdm
-from icecream import ic
 from copy import deepcopy
 from os.path import basename
 from bs4 import BeautifulSoup
@@ -16,6 +15,7 @@ from datetime import datetime, timedelta
 from os.path import realpath, dirname, join
 from simplejson.errors import JSONDecodeError
 import sys, json, requests, configparser
+from sys import exit
 
 class DeclareTokens:
 	def __init__(self):
@@ -42,8 +42,10 @@ class DeclareTokens:
 				tokens.update_refresh(json_object['refresh'])
 				tokens.update_access(json_object['access'])
 		except FileNotFoundError:
+			print('NOTFOUND')
 			raise Unauthorized
 		except json.decoder.JSONDecodeError:
+			print('UNAUTH')
 			raise Unauthorized
 
 class DeclareHeaders:
@@ -134,13 +136,12 @@ class ConsoleColor:
 	# End
 	END = '\033[0m'
 
-filename = basename(sys.argv[0])
-sys_path = __file__.replace(filename, '')
+sys_path = os.path.abspath(os.path.dirname(sys.executable))
 
 configParser = configparser.RawConfigParser()
-configFilePath = '{}{}'.format(sys_path, 'timetable.conf')
+configFilePath = '{}\{}'.format(sys_path, 'timetable.conf')
 configParser.read(configFilePath)
-envFilePath = join(dirname(__file__), '.timetable-env.json')
+envFilePath = '{}\{}'.format(sys_path, '.timetable-env.json')
 
 platform_hostname = configParser.get('Platform', 'platformUrl')
 worker_id = configParser.get('Worker Details', 'workerID')
@@ -166,8 +167,8 @@ def request_validator(status_code, *request_json):
 		raise Unauthorized
 	elif match(r"4[0-9][0-9]", str(status_code)):
 		print_something('RED', 'Page thrown an error! --> https.status_code: ', status_code)
-		ic(status_code)
-		if request_json: ic(request_json)
+		print(status_code)
+		if request_json: print(request_json)
 		raise PageError
 
 def _init_validate_tokens():
@@ -215,8 +216,8 @@ def do_refresh_token():
 			platform_login()
 			return
 		except PageError:
-			ic(status_code)
-			ic(request_json)
+			print(status_code)
+			print(request_json)
 			if not tokens.refresh_token:
 				print_something('RED', 'Valid token missing!, performing initial login')
 				_init_validate_tokens()
@@ -274,15 +275,15 @@ def get_counters(*validate):
 			request_validator(status_code, request_json)
 			break
 		except Unauthorized:
-			ic(status_code)
-			ic(request_json)
+			print(status_code)
+			print(request_json)
 			do_refresh_token()
 		except PageError:
 			print_something('RED', 'Error while getting counters')
 			exit(1)
 
-	ic(status_code)
-	ic(request_json)
+	print(status_code)
+	print(request_json)
 
 def print_something(COLORNAME, text, *var):
 	def print_func(arg):
@@ -330,7 +331,7 @@ def timetable(year, month, *shows_weekends):
 				if fday.weekday()<5: date_list.append(fday)
 
 	row_color = {}
-	row_color[0] = 'BLUE'
+	row_color[0] = 'WHITE'
 	row_color[1] = 'RED'
 	row_color[2] = 'RED'
 	row_color[3] = 'RED'
