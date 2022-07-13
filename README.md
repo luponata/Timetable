@@ -4,11 +4,13 @@
 2nd argument = Month (Without "0" prefix)\
 Optional "weekends" argument" = Show weekends in table
 
-#### Example A: 
+#### Python examples
 ```
 ./timemap.py 2022 6
-```
-#### Example B: 
-```
 ./timemap.py 2022 11 weekends
+```
+#### Windows examples
+```
+./timemap_win.exe 2022 6
+./timemap_win.exe 2022 11 weekends
 ```
