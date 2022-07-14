@@ -18,3 +18,23 @@ Optional "weekends" argument" = Show weekends in table
 ./timemap_win.exe 2022 6
 ./timemap_win.exe 2022 11 weekends
 ```
+
+## Configuration
+At the first start, a template configuration file to be compiled will be created in the same folder as the script
+```
+# Timetable configuration file
+
+[Platform]
+platformUrl = platform.example.com
+
+[Worker Credentials]
+workerUsername = username
+workerPassword = password
+
+[Worker Details]
+workerName = NAME SURNAME
+workerID = ID
+
+[Settings]
+ClearScreenBeforePrinting = True
+```
