@@ -1,4 +1,8 @@
-# Timetable's Legend
+# Timetable
+
+Print a table showing the committed working hours per day for the specified month
+
+## Legend
 
 1st argument = Year (4 digits)\
 2nd argument = Month (Without "0" prefix)\
