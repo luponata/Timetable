@@ -33,8 +33,8 @@ At the first start, a template configuration file to be compiled will be created
 Platform Url = platform.example.com
 
 [Worker Credentials]
-Worker Username = username
-Worker Password = password
+Worker Username = USERNAME
+Worker Password = PASSWORD
 
 [Worker Details]
 Worker Name = NAME SURNAME
