@@ -1,7 +1,8 @@
-beautifulsoup4
-colorama
-configparser
-datetime
-icecream
-prettytable
-requests
+beautifulsoup4==4.11.1
+Click==7.0
+colorama==0.4.3
+icecream==2.1.0
+prettytable==2.1.0
+requests==2.22.0
+simplejson==3.17.6
+tqdm==4.59.0
