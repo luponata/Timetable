@@ -1,21 +1,26 @@
 #!/usr/bin/env python3
-# Timetable [13722]
+APP_NAME='Timetable'
+APP_VERSION='v4822'
 
+from sys import exit
 from re import match
-from os import mkdir, system, name
+from pathlib import Path
 from tqdm import tqdm
-from icecream import ic
 from copy import deepcopy
-from os.path import basename
 from bs4 import BeautifulSoup
 from socket import gethostbyname
 from prettytable import PrettyTable
 from colorama import Fore, Back, Style
 from base64 import b64encode, b64decode
+from os import mkdir, system, name, path
 from datetime import datetime, timedelta
-from os.path import realpath, dirname, join
 from simplejson.errors import JSONDecodeError
+from os.path import realpath, dirname, join, basename, abspath
 import sys, json, requests, configparser
+
+class ExecutionType:
+	def __init__(self):
+		self.value = None
 
 class DeclareTokens:
 	def __init__(self):
@@ -31,12 +36,12 @@ class DeclareTokens:
 	def export_json(self):
 		json_object = {"refresh": tokens.refresh_token.decode('utf-8'), "access": tokens.access_token.decode('utf-8')}
 
-		with open(envFilePath, 'w+') as text_file:
+		with open(envFile.path, 'w+') as text_file:
 			text_file.write(json.dumps(json_object))
 
 	def try_load_json(self):
 		try:
-			with open(envFilePath, 'r') as text_file:
+			with open(envFile.path, 'r') as text_file:
 				global json_object
 				json_object = json.load(text_file)
 				tokens.update_refresh(json_object['refresh'])
@@ -61,7 +66,7 @@ class DeclareHeaders:
 		"sec-fetch-dest": "empty",
 		"sec-fetch-mode": "cors",
 		"sec-fetch-site": "same-origin",
-		"user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36"
+		"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36"
 		}
 
 	def generate_platform_login(self):
@@ -134,20 +139,112 @@ class ConsoleColor:
 	# End
 	END = '\033[0m'
 
-filename = basename(sys.argv[0])
-sys_path = __file__.replace(filename, '')
+class WeekendsClass:
+	def __init__(self):
+		self.value = False
+
+class EnvClass:
+	def __init__(self):
+		self.path = False
+
+def print_debug(data):
+	if execution_type == 'Script':
+		ic(data)
+	else: print(data)
+
+
+def print_something(COLORNAME, text, *var):
+	def print_func(arg):
+		if type(COLORNAME) == tuple:
+			if len(COLORNAME) == 3:
+				print(arg)
+		else:
+			print()
+			print(arg)
+
+	if type(COLORNAME) == tuple: # With variable and different colors
+		if len(COLORNAME) == 2:
+			print_func(f'{Style.BRIGHT}{getattr(Fore, COLORNAME[0])}{text}{getattr(Fore, COLORNAME[1])}{var[0]}{Style.RESET_ALL}')
+		elif len(COLORNAME) == 3:
+			if COLORNAME[2] == 'NOBRIGHT':
+				print_func(f'{Style.BRIGHT}{getattr(Fore, COLORNAME[0])}{text}{Style.NORMAL}{getattr(Fore, COLORNAME[1])}{var[0]}{Style.RESET_ALL}')
+			else: print_func('Unrecognized 3rd color arguments!')
+	elif var: # With variable and same color
+		print_func(f'{Style.BRIGHT}{getattr(Fore, COLORNAME)}{text}{var[0]}{Style.RESET_ALL}')
+	else: # Just text
+		print_func(f'{Style.BRIGHT}{getattr(Fore, COLORNAME)}{text}{Style.RESET_ALL}')
+
+confFileContent = '''# Timetable configuration file
+
+[Platform]
+Platform Url = example.com
+
+[Worker Credentials]
+Worker Username = username
+Worker Password = password
+
+[Worker Details]
+Worker Name = FULL NAME
+Worker ID = ID
+
+[Settings]
+Clear screen before printing = True
+'''
+
+execution_type = ExecutionType()
+envFile = EnvClass()
+shows_weekends = WeekendsClass()
+
+# test
+sys_path = abspath(dirname(sys.executable))
+
+# Verify execution type
+if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'): # Exe bundle
+	configFilePath = join(sys_path, 'timetable.conf')
+	#print_debug('Executable')
+	execution_type.value = 'Executable'
+
+else: # Python script
+	configFilePath = join(dirname(__file__), 'timetable.conf')
+	from icecream import ic
+	execution_type.value = 'Script'
+	#print_debug('Script')
+
+#print('configFilePath', configFilePath)
+
+if not Path(configFilePath).is_file():
+	with open(configFilePath, 'w') as text_file:
+		text_file.write(confFileContent)
+	print_something('WHITE', 'Missing configuration file, a template one was created on: ', configFilePath)
+	print_something('YELLOW', 'You need to customize it!')
+	exit(1)
+
+#
+#filename = basename(sys.argv[0])
+#sys_path = __file__.replace(filename, '')
 
 configParser = configparser.RawConfigParser()
-configFilePath = '{}{}'.format(sys_path, 'timetable.conf')
-configParser.read(configFilePath)
-envFilePath = join(dirname(__file__), '.timetable-env.json')
+#configFilePath = '{}{}'.format(sys_path, 'timetable.conf')
+configParser.read(configFilePath),
 
-platform_hostname = configParser.get('Platform', 'platformUrl')
-worker_id = configParser.get('Worker Details', 'workerID')
-worker_name = configParser.get('Worker Details', 'workerName')
-worker_username = b64encode(configParser.get('Worker Credentials', 'workerUsername').encode('utf-8'))
-worker_password = b64encode(configParser.get('Worker Credentials', 'workerPassword').encode('utf-8'))
-clear_screen = configParser.getboolean('Settings', 'ClearScreenBeforePrinting')
+if execution_type.value == 'Script':
+	envFile.path = join(dirname(__file__), '.timetable-env.json')
+else:
+	envFile.path = '{}\{}'.format(sys_path, '.timetable-env.json')
+
+platform_hostname = configParser.get('Platform', 'Platform Url')
+worker_id = configParser.get('Worker Details', 'Worker ID')
+worker_name = configParser.get('Worker Details', 'Worker Name')
+worker_username = b64encode(configParser.get('Worker Credentials', 'Worker Username').encode('utf-8'))
+worker_password = b64encode(configParser.get('Worker Credentials', 'Worker Password').encode('utf-8'))
+clear_screen = configParser.getboolean('Settings', 'Clear screen before printing')
+
+CURRENT_MONTH = datetime.now().month
+CURRENT_YEAR = datetime.now().year
+
+if platform_hostname == 'example.com':
+	print_something('YELLOW', 'You still need to customize the template configuration!: ', configFilePath)
+	exit(1)
 
 def x_print_help():
 	print()
@@ -156,9 +253,12 @@ def x_print_help():
 	print(f'# {Style.BRIGHT}{Fore.GREEN}1st argument{Style.RESET_ALL} = Year (4 digits)' )
 	print(f'# {Style.BRIGHT}{Fore.GREEN}2nd argument{Style.RESET_ALL} = Month (Without "0" prefix)')
 	print(f'# {Style.BRIGHT}{Fore.YELLOW}Optional "weekends" argument"{Style.RESET_ALL} = Show weekends in table')
+	print(f'# {Style.BRIGHT}{Fore.CYAN}You can call Timetable without arguments to use current month{Style.RESET_ALL}')
 	print()
-	print(f"{Style.BRIGHT}# Example A:{Style.RESET_ALL} ./timemap.py 2022 6")
-	print(f"{Style.BRIGHT}# Example B:{Style.RESET_ALL} ./timemap.py 2022 11 weekends")
+	print(f"{Style.BRIGHT}# Example A:{Style.RESET_ALL} ./timemap.py {Style.BRIGHT}{Fore.YELLOW}(use current month){Style.RESET_ALL}")
+	print(f"{Style.BRIGHT}# Example B:{Style.RESET_ALL} ./timemap.py weekends {Style.BRIGHT}{Fore.YELLOW}(use current month plus weekends){Style.RESET_ALL}")
+	print(f"{Style.BRIGHT}# Example C:{Style.RESET_ALL} ./timemap.py 2022 6 {Style.BRIGHT}{Fore.YELLOW}(specify a year and month){Style.RESET_ALL}")
+	print(f"{Style.BRIGHT}# Example D:{Style.RESET_ALL} ./timemap.py 2022 11 weekends {Style.BRIGHT}{Fore.YELLOW}(specify a year and month plus weekends){Style.RESET_ALL}")
 	exit(0)
 
 def request_validator(status_code, *request_json):
@@ -166,8 +266,8 @@ def request_validator(status_code, *request_json):
 		raise Unauthorized
 	elif match(r"4[0-9][0-9]", str(status_code)):
 		print_something('RED', 'Page thrown an error! --> https.status_code: ', status_code)
-		ic(status_code)
-		if request_json: ic(request_json)
+		debug_print(status_code)
+		if request_json: debug_print(request_json)
 		raise PageError
 
 def _init_validate_tokens():
@@ -211,14 +311,14 @@ def do_refresh_token():
 			request_validator(status_code, request_json)
 			break
 		except Unauthorized: # Must launch platform_login() again
-			print_something('YELLOW', 'Re-authenticating')
+			print_something('YELLOW', 'Reauthenticating...')
 			platform_login()
 			return
 		except PageError:
-			ic(status_code)
-			ic(request_json)
+			debug_print(status_code)
+			debug_print(request_json)
 			if not tokens.refresh_token:
-				print_something('RED', 'Valid token missing!, performing initial login')
+				print_something('RED', 'Valid token missing!, performing authentication')
 				_init_validate_tokens()
 			return
 
@@ -274,38 +374,17 @@ def get_counters(*validate):
 			request_validator(status_code, request_json)
 			break
 		except Unauthorized:
-			ic(status_code)
-			ic(request_json)
+			debug_print(status_code)
+			debug_print(request_json)
 			do_refresh_token()
 		except PageError:
 			print_something('RED', 'Error while getting counters')
 			exit(1)
 
-	ic(status_code)
-	ic(request_json)
+	debug_print(status_code)
+	debug_print(request_json)
 
-def print_something(COLORNAME, text, *var):
-	def print_func(arg):
-		if type(COLORNAME) == tuple:
-			if len(COLORNAME) == 3:
-				print(arg)
-		else:
-			print()
-			print(arg)
-
-	if type(COLORNAME) == tuple: # With variable and different colors
-		if len(COLORNAME) == 2:
-			print_func(f'{Style.BRIGHT}{getattr(Fore, COLORNAME[0])}{text}{getattr(Fore, COLORNAME[1])}{var[0]}{Style.RESET_ALL}')
-		elif len(COLORNAME) == 3:
-			if COLORNAME[2] == 'NOBRIGHT':
-				print_func(f'{Style.BRIGHT}{getattr(Fore, COLORNAME[0])}{text}{Style.NORMAL}{getattr(Fore, COLORNAME[1])}{var[0]}{Style.RESET_ALL}')
-			else: print_func('Unrecognized 3rd color arguments!')
-	elif var: # With variable and same color
-		print_func(f'{Style.BRIGHT}{getattr(Fore, COLORNAME)}{text}{var[0]}{Style.RESET_ALL}')
-	else: # Just text
-		print_func(f'{Style.BRIGHT}{getattr(Fore, COLORNAME)}{text}{Style.RESET_ALL}')
-
-def timetable(year, month, *shows_weekends):
+def timetable(year, month):
 	date_list = []
 	holidays_list = []
 	month_worktime = []
@@ -330,7 +409,6 @@ def timetable(year, month, *shows_weekends):
 				if fday.weekday()<5: date_list.append(fday)
 
 	row_color = {}
-	row_color[0] = 'BLUE'
 	row_color[1] = 'RED'
 	row_color[2] = 'RED'
 	row_color[3] = 'RED'
@@ -339,15 +417,17 @@ def timetable(year, month, *shows_weekends):
 	row_color[6] = 'YELLOW'
 	row_color[7] = 'GREEN'
 
+	if execution_type.value == 'Script': row_color[0] = 'BLUE'
+	else: row_color[0] = 'WHITE'
+
 	worktime_table = PrettyTable()
 
-	if shows_weekends:
-		if shows_weekends[0]:
-			business_days(shows_weekends)
-			worktime_table.field_names = ['Day (Weekends in purple)', 'Total Worktime']
-		else:
-			business_days()
-			worktime_table.field_names = ['Day', 'Total Worktime']
+	if shows_weekends.value:
+		business_days(shows_weekends)
+		worktime_table.field_names = ['Day (Weekends in purple)', 'Total Worktime']
+	else:
+		business_days()
+		worktime_table.field_names = ['Day', 'Total Worktime']
 
 	for day in tqdm(date_list, desc="Loading.."):
 		if day in holidays_list: fday = ConsoleColor.PURPLE + str(day) + ConsoleColor.END
@@ -412,18 +492,41 @@ def _search_assistances(date, do_print):
 	else:
 		return sum(lenght_list, timedelta())
 
-def launchtable():
-	year = int(sys.argv[1])
-	month = int(sys.argv[2])
+def launch_table():
 
-	if len(sys.argv) > 3:
-		if sys.argv[3] == 'weekends': shows_weekends = True
+	def _launch_table(year, month):
+		timetable(year, month)
+
+	def check_weekends(arg_number):
+		if sys.argv[arg_number] == 'weekends': shows_weekends.value = True
 		else:
-			print_something('RED', 'Unrecognized optional argument, you can only use "weekends"')
-			exit(1)
-	else: shows_weekends = False
+			if not sys.argv[arg_number].isnumeric():
+				print_something('RED', 'Unrecognized optional argument, you can use "weekends" only')
+				exit(1)
+			else:
+				x_print_help()
 
-	timetable(year, month, shows_weekends)
+	if len(sys.argv) == 1: # Clean call
+		year = CURRENT_YEAR
+		month = CURRENT_MONTH
+		_launch_table(year, month)
+
+	if len(sys.argv) == 2: # Clean call with weekends
+		year = CURRENT_YEAR
+		month = CURRENT_MONTH
+		check_weekends(1)
+		_launch_table(year, month)
+
+	if len(sys.argv) == 3: # Defined call
+		year = int(sys.argv[1])
+		month = int(sys.argv[2])
+		_launch_table(year, month)
+
+	if len(sys.argv) == 4: # Defined call with weekends
+		year = int(sys.argv[1])
+		month = int(sys.argv[2])
+		check_weekends(3)
+		_launch_table(year, month)
 
 ###################
 tokens = DeclareTokens()
@@ -437,9 +540,8 @@ def session_begin(action, login, *args):
 
 #### BEGIN
 if not sys.flags.interactive:
-	if len(sys.argv) == 1:
-		x_print_help()
-	elif sys.argv[1] == 'help': # Show help
-		x_print_help()
-	else:
-		session_begin(launchtable, 1)
+	if len(sys.argv) == 2:
+		if sys.argv[1] == 'help': # Show help
+			x_print_help()
+
+	session_begin(launch_table, 1)
