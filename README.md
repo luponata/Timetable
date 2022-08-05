@@ -6,17 +6,22 @@ Print a table showing the committed working hours per day for the specified mont
 
 1st argument = Year (4 digits)\
 2nd argument = Month (Without "0" prefix)\
-Optional "weekends" argument" = Show weekends in table
+Optional "weekends" argument" = Show weekends in table\
+You can call Timetable without arguments to use current month
 
 #### Python examples
 ```
-./timemap.py 2022 6
-./timemap.py 2022 11 weekends
+./timemap.py (use current month)
+./timemap.py weekends (use current month plus weekends)
+./timemap.py 2022 6 (specifies year and month)
+./timemap.py 2022 11 weekends (specifies year and month plus weekends)
 ```
 #### Windows examples
 ```
-./timemap_win.exe 2022 6
-./timemap_win.exe 2022 11 weekends
+./timemap.exe (use current month)
+./timemap.exe weekends (use current month plus weekends)
+./timemap.exe 2022 6 (specifies year and month)
+./timemap.exe 2022 11 weekends (specifies year and month plus weekends)
 ```
 
 ## Configuration
@@ -25,16 +30,16 @@ At the first start, a template configuration file to be compiled will be created
 # Timetable configuration file
 
 [Platform]
-platformUrl = platform.example.com
+Platform Url = platform.example.com
 
 [Worker Credentials]
-workerUsername = username
-workerPassword = password
+Worker Username = username
+Worker Password = password
 
 [Worker Details]
-workerName = NAME SURNAME
-workerID = ID
+Worker Name = NAME SURNAME
+Worker ID = ID
 
 [Settings]
-ClearScreenBeforePrinting = True
+Clear screen before printing = True
 ```
