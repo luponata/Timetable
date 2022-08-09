@@ -17,7 +17,7 @@ timemap.[py/exe] 2022 6 (specifies year and month)
 timemap.[py/exe] 2022 11 weekends (specifies year and month plus weekends)
 ```
 ## Configuration
-At the first start, a template configuration file to be customized will be created in the same folder as the script
+At the first start, a template configuration file to be customized will be created in the same folder as the script:
 ```
 # Timetable configuration file
 
@@ -35,3 +35,4 @@ Worker ID = ID
 [Settings]
 Clear screen before printing = True
 ```
+After the first launch, the credentials on the configuration file will be deleted, hashed and saved on a hidden JSON file, to update them, just put the newer ones on the configuration file again.
