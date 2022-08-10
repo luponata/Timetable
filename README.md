@@ -5,7 +5,7 @@ Print a table showing the committed working hours per day for the specified mont
 ## Legend
 
 1° parameter = Year (4 digits)\
-2° parameter = Month (1/2 digits, Without "0" prefix)\
+2° parameter = Month (1/2 digits, **without "0" prefix**)\
 Optional "weekends" parameter" = Show weekends in table\
 You can call Timetable without parameters to see current month hours
 
