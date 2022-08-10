@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 APP_NAME='Timetable'
-APP_VERSION='v4822'
+APP_VERSION='v10822'
 
+import sys, json, requests, configparser
 from sys import exit
 from re import match
 from pathlib import Path
@@ -16,11 +17,38 @@ from os import mkdir, system, name, path
 from datetime import datetime, timedelta
 from simplejson.errors import JSONDecodeError
 from os.path import realpath, dirname, join, basename, abspath
-import sys, json, requests, configparser
 
 class ExecutionType:
 	def __init__(self):
 		self.value = None
+
+class ManageCredentials:
+	def __init__(self):
+		self.username = None
+		self.password = None
+
+	def update_username(self, username):
+		self.username = username
+
+	def update_password(self, password):
+		self.password = password
+
+	def export_json(self):
+		json_object = {"1": self.username.decode('utf-8'), "2": self.password.decode('utf-8')}
+
+		with open(env_files.credentials_path, 'w+') as text_file:
+			text_file.write(json.dumps(json_object))
+
+	def try_load_json(self):
+		try:
+			with open(env_files.credentials_path, 'r') as text_file:
+				json_object = json.load(text_file)
+				self.update_username(json_object['1'])
+				self.update_password(json_object['2'])
+		except FileNotFoundError:
+			raise Unauthorized
+		except json.decoder.JSONDecodeError:
+			raise Unauthorized
 
 class DeclareTokens:
 	def __init__(self):
@@ -34,18 +62,17 @@ class DeclareTokens:
 		self.access_token = access_token
 
 	def export_json(self):
-		json_object = {"refresh": tokens.refresh_token.decode('utf-8'), "access": tokens.access_token.decode('utf-8')}
+		json_object = {"refresh": self.refresh_token.decode('utf-8'), "access": self.access_token.decode('utf-8')}
 
-		with open(envFile.path, 'w+') as text_file:
+		with open(env_files.tokens_path, 'w+') as text_file:
 			text_file.write(json.dumps(json_object))
 
 	def try_load_json(self):
 		try:
-			with open(envFile.path, 'r') as text_file:
-				global json_object
+			with open(env_files.tokens_path, 'r') as text_file:
 				json_object = json.load(text_file)
-				tokens.update_refresh(json_object['refresh'])
-				tokens.update_access(json_object['access'])
+				self.update_refresh(json_object['refresh'])
+				self.update_access(json_object['access'])
 		except FileNotFoundError:
 			raise Unauthorized
 		except json.decoder.JSONDecodeError:
@@ -78,8 +105,7 @@ class DeclareHeaders:
 
 	def generate_refresh_token(self):
 		self.refresh_token = deepcopy(self.generic_header)
-		self.refresh_token["path"] = "/api/token-auth/"
-		self.refresh_token["referer"] = "https://{}/auth/login".format(platform_hostname)
+		self.refresh_token["path"] = "/api/token-refresh/"
 		self.refresh_token.pop("authority")
 		self.refresh_token.pop("scheme")
 		self.refresh_token.pop("sec-fetch-dest")
@@ -145,16 +171,19 @@ class WeekendsClass:
 
 class EnvClass:
 	def __init__(self):
-		self.path = False
+		self.tokens_path = None
+		self.credentials_path = None
 
-def print_debug(data):
-	if execution_type == 'Script':
-		ic(data)
-	else: print(data)
+def debug_print(varname, data):
+	if execution_type.value == 'Script':
+		ic('{}: {}'.format(varname, data))
+	else:
+		#print('{}: {}'.format(varname, data))
+		color_print('YELLOW', 'CYAN', 'NOBRIGHT', varname, data)
 
 
-def print_something(COLORNAME, text, *var):
-	def print_func(arg):
+def color_print(COLORNAME, text, *var):
+	def _color_print(arg):
 		if type(COLORNAME) == tuple:
 			if len(COLORNAME) == 3:
 				print(arg)
@@ -164,15 +193,15 @@ def print_something(COLORNAME, text, *var):
 
 	if type(COLORNAME) == tuple: # With variable and different colors
 		if len(COLORNAME) == 2:
-			print_func(f'{Style.BRIGHT}{getattr(Fore, COLORNAME[0])}{text}{getattr(Fore, COLORNAME[1])}{var[0]}{Style.RESET_ALL}')
+			_color_print(f'{Style.BRIGHT}{getattr(Fore, COLORNAME[0])}{text}{getattr(Fore, COLORNAME[1])}{var[0]}{Style.RESET_ALL}')
 		elif len(COLORNAME) == 3:
 			if COLORNAME[2] == 'NOBRIGHT':
-				print_func(f'{Style.BRIGHT}{getattr(Fore, COLORNAME[0])}{text}{Style.NORMAL}{getattr(Fore, COLORNAME[1])}{var[0]}{Style.RESET_ALL}')
-			else: print_func('Unrecognized 3rd color arguments!')
+				_color_print(f'{Style.BRIGHT}{getattr(Fore, COLORNAME[0])}{text}{Style.NORMAL}{getattr(Fore, COLORNAME[1])}{var[0]}{Style.RESET_ALL}')
+			else: _color_print('Unrecognized 3rd color arguments!')
 	elif var: # With variable and same color
-		print_func(f'{Style.BRIGHT}{getattr(Fore, COLORNAME)}{text}{var[0]}{Style.RESET_ALL}')
+		_color_print(f'{Style.BRIGHT}{getattr(Fore, COLORNAME)}{text}{var[0]}{Style.RESET_ALL}')
 	else: # Just text
-		print_func(f'{Style.BRIGHT}{getattr(Fore, COLORNAME)}{text}{Style.RESET_ALL}')
+		_color_print(f'{Style.BRIGHT}{getattr(Fore, COLORNAME)}{text}{Style.RESET_ALL}')
 
 confFileContent = '''# Timetable configuration file
 
@@ -180,8 +209,8 @@ confFileContent = '''# Timetable configuration file
 Platform Url = example.com
 
 [Worker Credentials]
-Worker Username = username
-Worker Password = password
+Worker Username = USERNAME
+Worker Password = PASSWORD
 
 [Worker Details]
 Worker Name = FULL NAME
@@ -192,82 +221,91 @@ Clear screen before printing = True
 '''
 
 execution_type = ExecutionType()
-envFile = EnvClass()
+env_files = EnvClass()
+credentials = ManageCredentials()
 shows_weekends = WeekendsClass()
 
-# test
 sys_path = abspath(dirname(sys.executable))
 
 # Verify execution type
 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'): # Exe bundle
 	configFilePath = join(sys_path, 'timetable.conf')
-	#print_debug('Executable')
 	execution_type.value = 'Executable'
 
 else: # Python script
 	configFilePath = join(dirname(__file__), 'timetable.conf')
 	from icecream import ic
 	execution_type.value = 'Script'
-	#print_debug('Script')
-
-#print('configFilePath', configFilePath)
 
 if not Path(configFilePath).is_file():
 	with open(configFilePath, 'w') as text_file:
 		text_file.write(confFileContent)
-	print_something('WHITE', 'Missing configuration file, a template one was created on: ', configFilePath)
-	print_something('YELLOW', 'You need to customize it!')
+	color_print('WHITE', 'Missing configuration file, a template one was created on: ', configFilePath)
+	color_print('YELLOW', 'You need to customize it!')
 	exit(1)
 
-#
-#filename = basename(sys.argv[0])
-#sys_path = __file__.replace(filename, '')
-
-configParser = configparser.RawConfigParser()
-#configFilePath = '{}{}'.format(sys_path, 'timetable.conf')
-configParser.read(configFilePath),
+configParser = configparser.RawConfigParser(interpolation=None, allow_no_value=True)
+configParser.optionxform = str
+configParser.read(configFilePath)
 
 if execution_type.value == 'Script':
-	envFile.path = join(dirname(__file__), '.timetable-env.json')
+	env_files.tokens_path = join(dirname(__file__), '.timetable-tks.json')
+	env_files.credentials_path = join(dirname(__file__), '.timetable-crd.json')
 else:
-	envFile.path = '{}\{}'.format(sys_path, '.timetable-env.json')
+	env_files.tokens_path = '{}\{}'.format(sys_path, '.timetable-tks.json')
+	env_files.credentials_path = '{}\{}'.format(sys_path, '.timetable-crd.json')
 
 platform_hostname = configParser.get('Platform', 'Platform Url')
 worker_id = configParser.get('Worker Details', 'Worker ID')
 worker_name = configParser.get('Worker Details', 'Worker Name')
-worker_username = b64encode(configParser.get('Worker Credentials', 'Worker Username').encode('utf-8'))
-worker_password = b64encode(configParser.get('Worker Credentials', 'Worker Password').encode('utf-8'))
 clear_screen = configParser.getboolean('Settings', 'Clear screen before printing')
 
 CURRENT_MONTH = datetime.now().month
 CURRENT_YEAR = datetime.now().year
 
+def empty_configparser_value(section, item, value):
+	configParser.set(section, item, value)
+	with open(configFilePath, 'w') as configfile:
+		configParser.write(configfile)
+
 if platform_hostname == 'example.com':
-	print_something('YELLOW', 'You still need to customize the template configuration!: ', configFilePath)
+	color_print('YELLOW', 'You still need to customize the template configuration!: ', configFilePath)
 	exit(1)
+
+if configParser.get('Worker Credentials', 'Worker Username') and configParser.get('Worker Credentials', 'Worker Password'): # Get credentials from conf file
+	credentials.update_username(b64encode(configParser.get('Worker Credentials', 'Worker Username').encode('utf-8')))
+	credentials.update_password(b64encode(configParser.get('Worker Credentials', 'Worker Password').encode('utf-8')))
+	credentials.export_json()
+	empty_configparser_value('Worker Credentials', 'Worker Username', None)
+	empty_configparser_value('Worker Credentials', 'Worker Password', None)
+	with open(configFilePath, 'w') as configfile:
+		configParser.write(configfile)
+else: # Get credentials from JSON file
+	credentials.try_load_json()
+
 
 def x_print_help():
 	print()
 	print(f"## {Style.BRIGHT}Timetable's Legend{Style.RESET_ALL} ##")
 	print()
-	print(f'# {Style.BRIGHT}{Fore.GREEN}1st argument{Style.RESET_ALL} = Year (4 digits)' )
-	print(f'# {Style.BRIGHT}{Fore.GREEN}2nd argument{Style.RESET_ALL} = Month (Without "0" prefix)')
-	print(f'# {Style.BRIGHT}{Fore.YELLOW}Optional "weekends" argument"{Style.RESET_ALL} = Show weekends in table')
-	print(f'# {Style.BRIGHT}{Fore.CYAN}You can call Timetable without arguments to use current month{Style.RESET_ALL}')
+	print(f'# {Style.BRIGHT}{Fore.GREEN}1° parameter{Style.RESET_ALL} = Year (4 digits)' )
+	print(f'# {Style.BRIGHT}{Fore.GREEN}2° parameter{Style.RESET_ALL} = Month (Without "0" prefix)')
+	print(f'# {Style.BRIGHT}{Fore.YELLOW}Optional "weekends" parameter"{Style.RESET_ALL} = Show weekends in table')
+	print(f'# {Style.BRIGHT}{Fore.CYAN}You can call Timetable without parameters to see current month hours{Style.RESET_ALL}')
 	print()
-	print(f"{Style.BRIGHT}# Example A:{Style.RESET_ALL} ./timemap.py {Style.BRIGHT}{Fore.YELLOW}(use current month){Style.RESET_ALL}")
-	print(f"{Style.BRIGHT}# Example B:{Style.RESET_ALL} ./timemap.py weekends {Style.BRIGHT}{Fore.YELLOW}(use current month plus weekends){Style.RESET_ALL}")
-	print(f"{Style.BRIGHT}# Example C:{Style.RESET_ALL} ./timemap.py 2022 6 {Style.BRIGHT}{Fore.YELLOW}(specify a year and month){Style.RESET_ALL}")
-	print(f"{Style.BRIGHT}# Example D:{Style.RESET_ALL} ./timemap.py 2022 11 weekends {Style.BRIGHT}{Fore.YELLOW}(specify a year and month plus weekends){Style.RESET_ALL}")
+	print(f"{Style.BRIGHT}# Example A:{Style.RESET_ALL} timetable.[py/exe] {Style.BRIGHT}{Fore.YELLOW}(use current month){Style.RESET_ALL}")
+	print(f"{Style.BRIGHT}# Example B:{Style.RESET_ALL} timetable.[py/exe] weekends {Style.BRIGHT}{Fore.YELLOW}(use current month plus weekends){Style.RESET_ALL}")
+	print(f"{Style.BRIGHT}# Example C:{Style.RESET_ALL} timetable.[py/exe] 2022 6 {Style.BRIGHT}{Fore.YELLOW}(specifies year and month){Style.RESET_ALL}")
+	print(f"{Style.BRIGHT}# Example D:{Style.RESET_ALL} timetable.[py/exe] 2022 11 weekends {Style.BRIGHT}{Fore.YELLOW}(specifies year and month plus weekends){Style.RESET_ALL}")
 	exit(0)
 
-def request_validator(status_code, *request_json):
+def request_validator(status_code, *request_json): # Checking status_code for requests
 	if status_code == 401:
 		raise Unauthorized
 	elif match(r"4[0-9][0-9]", str(status_code)):
-		print_something('RED', 'Page thrown an error! --> https.status_code: ', status_code)
-		debug_print(status_code)
-		if request_json: debug_print(request_json)
+		color_print('RED', 'Page thrown an error! --> https.status_code: ', status_code)
+		debug_print('status_code', status_code)
+		if request_json: debug_print('request_json', request_json)
 		raise PageError
 
 def _init_validate_tokens():
@@ -279,17 +317,17 @@ def _init_validate_tokens():
 			request_validator(status_code)
 			break
 		except requests.exceptions.ConnectionError:
-			print_something('YELLOW', 'Platform unavailable!, check your network settings')
+			color_print('YELLOW', 'Platform unavailable!, check your network settings')
 			exit(1)
 		except Unauthorized:
-			print_something('YELLOW', 'Requesting new tokens')
+			color_print('YELLOW', 'Requesting new tokens')
 			platform_login()
 			return
 		except PageError:
-			print_something('RED', 'Error while validating tokens')
+			color_print('RED', 'Error while validating tokens')
 			exit(1)
 
-	print_something('GREEN', 'Tokens OK')
+	color_print('GREEN', 'Tokens OK')
 
 def do_refresh_token():
 	def launch_request():
@@ -303,7 +341,7 @@ def do_refresh_token():
 		req = s.post(url, headers=headers.refresh_token, data=data)
 		return req.status_code, req.json()
 
-	print_something('YELLOW', 'Access token expired')
+	color_print('YELLOW', 'Access token expired')
 
 	while True:
 		try:
@@ -311,21 +349,21 @@ def do_refresh_token():
 			request_validator(status_code, request_json)
 			break
 		except Unauthorized: # Must launch platform_login() again
-			print_something('YELLOW', 'Reauthenticating...')
+			color_print('YELLOW', 'Reauthenticating...')
 			platform_login()
 			return
 		except PageError:
-			debug_print(status_code)
-			debug_print(request_json)
+			debug_print('status_code', status_code)
+			debug_print('request_json', request_json)
 			if not tokens.refresh_token:
-				print_something('RED', 'Valid token missing!, performing authentication')
+				color_print('RED', 'Valid token missing!, performing authentication')
 				_init_validate_tokens()
 			return
 
 	tokens.update_refresh(request_json['refresh'])
 	tokens.update_access(request_json['access'])
 
-	print_something('GREEN', 'Token refreshed')
+	color_print('GREEN', 'Token refreshed')
 
 def platform_login():
 	def launch_request():
@@ -333,8 +371,8 @@ def platform_login():
 		url = "https://{}/api/token-auth/".format(platform_hostname)
 
 		data = {
-		"email" : b64decode(worker_username).decode('utf-8'),
-		"password" : b64decode(worker_password).decode('utf-8')
+		"email" : b64decode(credentials.username).decode('utf-8'),
+		"password" : b64decode(credentials.password).decode('utf-8')
 		}
 
 		req = s.post(url, headers=headers.platform_login, data=data)
@@ -349,12 +387,11 @@ def platform_login():
 		except PageError:
 			exit(1)
 
-
 	tokens.update_refresh(b64encode(request_json['refresh'].encode('utf-8')))
 	tokens.update_access(b64encode(request_json['access'].encode('utf-8')))
 	tokens.export_json()
 
-	print_something('GREEN', 'Logged')
+	color_print('GREEN', 'Logged')
 
 def get_counters(*validate):
 	def launch_request():
@@ -374,15 +411,10 @@ def get_counters(*validate):
 			request_validator(status_code, request_json)
 			break
 		except Unauthorized:
-			debug_print(status_code)
-			debug_print(request_json)
 			do_refresh_token()
 		except PageError:
-			print_something('RED', 'Error while getting counters')
+			color_print('RED', 'Error while getting counters')
 			exit(1)
-
-	debug_print(status_code)
-	debug_print(request_json)
 
 def timetable(year, month):
 	date_list = []
@@ -447,7 +479,7 @@ def timetable(year, month):
 		#system('cls' if name == 'nt' else 'clear')
 
 	print(worktime_table)
-	print_something('WHITE', "Month Worktime: {}".format(format_timedelta(sum(month_worktime, timedelta()))))
+	color_print('WHITE', "Month Worktime: {}".format(format_timedelta(sum(month_worktime, timedelta()))))
 
 def _search_assistances(date, do_print):
 	def launch_request(worker_id, date):
@@ -465,7 +497,7 @@ def _search_assistances(date, do_print):
 		except Unauthorized:
 			do_refresh_token()
 		except PageError:
-			print_something('RED', "Error while searching assistances")
+			color_print('RED', "Error while searching assistances")
 			exit(1)
 
 	lenght_list = []
@@ -477,18 +509,18 @@ def _search_assistances(date, do_print):
 		lenght_list.append(assistance_lenght)
 
 		def xprint():
-			print_something('YELLOW', "Description: {}".format(BeautifulSoup(item['job_description'], 'lxml').text))
+			color_print('YELLOW', "Description: {}".format(BeautifulSoup(item['job_description'], 'lxml').text))
 			print("Start date : {}".format(date_begin))
 			print("End date   : {}".format(date_end))
 			print("Ticket ID: {}, Customer: {}, Description: {}".format(item['ticket']['id'], item['ticket']['organization']['name'], item['ticket']['title']))
 			print("Assistance ID: {}".format(item['id']))
-			print_something('CYAN', "Lenght: {}".format(assistance_lenght))
+			color_print('CYAN', "Lenght: {}".format(assistance_lenght))
 
 		if do_print:
 			xprint()
 
 	if do_print:
-		print_something('RED', "Day Worktime: {}".format(sum(lenght_list, timedelta())))
+		color_print('RED', "Day Worktime: {}".format(sum(lenght_list, timedelta())))
 	else:
 		return sum(lenght_list, timedelta())
 
@@ -501,7 +533,7 @@ def launch_table():
 		if sys.argv[arg_number] == 'weekends': shows_weekends.value = True
 		else:
 			if not sys.argv[arg_number].isnumeric():
-				print_something('RED', 'Unrecognized optional argument, you can use "weekends" only')
+				color_print('RED', 'Unrecognized optional argument, you can use "weekends" only')
 				exit(1)
 			else:
 				x_print_help()
