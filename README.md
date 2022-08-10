@@ -11,10 +11,10 @@ You can call Timetable without parameters to see current month hours
 
 #### Examples
 ```
-timemap.[py/exe] (use current month)
-timemap.[py/exe] weekends (use current month plus weekends)
-timemap.[py/exe] 2022 6 (specifies year and month)
-timemap.[py/exe] 2022 11 weekends (specifies year and month plus weekends)
+timetable.[py/exe] (use current month)
+timetable.[py/exe] weekends (use current month plus weekends)
+timetable.[py/exe] 2022 6 (specifies year and month)
+timetable.[py/exe] 2022 11 weekends (specifies year and month plus weekends)
 ```
 ## Configuration
 At the first start, a template configuration file to be customized will be created in the same folder as the script:
